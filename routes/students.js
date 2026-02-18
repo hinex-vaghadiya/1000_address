@@ -91,9 +91,16 @@ router.put('/:id', isAuthenticated, async (req, res) => {
     }
 });
 
-// Delete a student (admin only)
-router.delete('/:id', isAdmin, async (req, res) => {
+// Delete a student (user can delete own, admin can delete any)
+router.delete('/:id', isAuthenticated, async (req, res) => {
     try {
+        const student = await Student.findById(req.params.id);
+        if (!student) return res.status(404).json({ error: 'Student not found' });
+
+        if (req.session.user.role !== 'admin' && student.added_by !== req.session.user.username) {
+            return res.status(403).json({ error: 'You can only delete your own entries' });
+        }
+
         await Student.findByIdAndDelete(req.params.id);
         res.json({ message: 'Student deleted' });
     } catch (err) {

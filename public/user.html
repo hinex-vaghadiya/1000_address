@@ -343,7 +343,7 @@
             const pageData = allMyStudents.slice(start, start + perPage);
 
             let html = '<div class="table-wrapper"><table><thead><tr>';
-            html += '<th>Name</th><th>Std</th><th>School</th><th>Board</th><th>M.Mob</th><th>F.Mob</th><th>Address</th><th>Area</th><th>Date</th><th>Edit</th>';
+            html += '<th>Name</th><th>Std</th><th>School</th><th>Board</th><th>M.Mob</th><th>F.Mob</th><th>Address</th><th>Area</th><th>Date</th><th>Actions</th>';
             html += '</tr></thead><tbody>';
             pageData.forEach(s => {
                 const date = new Date(s.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
@@ -357,7 +357,7 @@
                 html += '<td>' + escapeHtml(s.address) + '</td>';
                 html += '<td>' + escapeHtml(s.area) + '</td>';
                 html += '<td>' + date + '</td>';
-                html += '<td><button class="btn btn-secondary btn-sm" onclick="openEdit(\'' + s._id + '\')">✏️</button></td>';
+                html += '<td style="white-space:nowrap;"><button class="btn btn-secondary btn-sm" onclick="openEdit(\'' + s._id + '\')">✏️</button> <button class="btn btn-danger btn-sm" onclick="deleteMyStudent(\'' + s._id + '\')">🗑</button></td>';
                 html += '</tr>';
             });
             html += '</tbody></table></div>';
@@ -376,6 +376,23 @@
             const totalPages = Math.ceil(allMyStudents.length / perPage);
             if (currentPage < totalPages) { currentPage++; renderPage(); }
         });
+
+        // --- Delete Student ---
+        async function deleteMyStudent(id) {
+            if (!confirm('Are you sure you want to delete this record?')) return;
+            try {
+                const res = await fetch('/api/students/' + id, { method: 'DELETE' });
+                const data = await res.json();
+                if (res.ok) {
+                    showAlert('Record deleted! 🗑️', 'success');
+                    await loadMyEntries();
+                } else {
+                    showAlert(data.error || 'Failed to delete', 'error');
+                }
+            } catch {
+                showAlert('Connection error.', 'error');
+            }
+        }
 
         // --- Edit Student ---
         function openEdit(id) {
