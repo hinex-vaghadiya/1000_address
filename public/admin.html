@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1000 Address — Admin Panel</title>
+    <meta name="description" content="Admin Dashboard - Manage users and view all student data">
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+</head>
+
+<body>
+    <div class="bg-animation">
+        <div class="orb"></div>
+        <div class="orb"></div>
+        <div class="orb"></div>
+    </div>
+
+    <div class="container">
+        <!-- Navbar -->
+        <nav class="navbar">
+            <div class="brand">🛡️ Admin Panel</div>
+            <div class="user-info">
+                <span class="user-badge"><span class="badge badge-admin">ADMIN</span></span>
+                <button class="btn-logout" id="logoutBtn">Logout</button>
+            </div>
+        </nav>
+
+        <!-- Stats -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-value" id="totalStudents">0</div>
+                <div class="stat-label">Students</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalUsers">0</div>
+                <div class="stat-label">Users</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="data">📊 All Data</button>
+            <button class="tab-btn" data-tab="users">👥 Users</button>
+            <button class="tab-btn" data-tab="create">➕ Create User</button>
+        </div>
+
+        <!-- Tab: All Data -->
+        <div class="tab-content active" id="tab-data">
+            <div class="card">
+                <div class="card-title" style="justify-content:space-between;flex-wrap:wrap;">
+                    <span><span class="icon">📊</span> All Student Data</span>
+                    <button class="btn btn-primary btn-sm" id="exportBtn" onclick="exportToExcel()">📥 Export
+                        Excel</button>
+                </div>
+                <div class="search-bar">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="searchInput" placeholder="Search by name, school, area, added by...">
+                </div>
+                <div id="dataContainer">
+                    <div class="empty-state">
+                        <div class="icon">📭</div>
+                        <p>No student data yet.</p>
+                    </div>
+                </div>
+                <div id="adminPagination" class="hidden"
+                    style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap;">
+                    <button class="btn btn-secondary btn-sm" id="adminPrevPage">⬅ Prev</button>
+                    <span id="adminPageInfo" style="color:var(--text-secondary);font-size:0.85rem;">Page 1 of 1</span>
+                    <button class="btn btn-secondary btn-sm" id="adminNextPage">Next ➡</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Users -->
+        <div class="tab-content" id="tab-users">
+            <div class="card">
+                <div class="card-title"><span class="icon">👥</span> All Users</div>
+                <div id="usersContainer">
+                    <div class="empty-state">
+                        <div class="icon">👤</div>
+                        <p>No users created yet.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Create User -->
+        <div class="tab-content" id="tab-create">
+            <div class="card">
+                <div class="card-title"><span class="icon">➕</span> Create New User</div>
+                <div id="createAlert" class="alert"></div>
+                <form id="createUserForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="newUsername">Username *</label>
+                            <input type="text" id="newUsername" placeholder="Enter username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="newPassword">Password *</label>
+                            <input type="password" id="newPassword" placeholder="Enter password" required>
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="newBranch">User Branch *</label>
+                            <input type="text" id="newBranch" placeholder="e.g. branch_name" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block mt-8">Create User</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <script>
+        let allStudents = [];
+
+        // --- Auth Check ---
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/auth/me');
+                const data = await res.json();
+                if (!data.user || data.user.role !== 'admin') {
+                    window.location.href = data.user ? '/user' : '/';
+                    return;
+                }
+            } catch {
+                window.location.href = '/';
+            }
+        }
+
+        // --- Alert ---
+        function showAlert(id, msg, type) {
+            const el = document.getElementById(id);
+            el.textContent = msg;
+            el.className = 'alert alert-' + type;
+            el.style.display = 'block';
+            setTimeout(() => { el.style.display = 'none'; }, 4000);
+        }
+
+        // --- Tabs ---
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+            });
+        });
+
+        // --- Load Stats ---
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/admin/stats');
+                const data = await res.json();
+                document.getElementById('totalStudents').textContent = data.totalStudents;
+                document.getElementById('totalUsers').textContent = data.totalUsers;
+            } catch { }
+        }
+
+        // --- Load All Data ---
+        let adminPage = 1;
+        const adminPerPage = 10;
+        let filteredStudents = [];
+
+        async function loadAllData() {
+            try {
+                const res = await fetch('/api/students');
+                const data = await res.json();
+                allStudents = data.students;
+                filteredStudents = allStudents;
+                adminPage = 1;
+                renderStudents();
+            } catch { }
+        }
+
+        function renderStudents() {
+            const container = document.getElementById('dataContainer');
+            const pagination = document.getElementById('adminPagination');
+
+            if (filteredStudents.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>No matching records found.</p></div>';
+                pagination.classList.add('hidden');
+                return;
+            }
+
+            const totalPages = Math.ceil(filteredStudents.length / adminPerPage);
+            if (adminPage > totalPages) adminPage = totalPages;
+            const start = (adminPage - 1) * adminPerPage;
+            const pageData = filteredStudents.slice(start, start + adminPerPage);
+
+            let html = '<div class="table-wrapper"><table><thead><tr>';
+            html += '<th>Name</th><th>Std</th><th>School</th><th>Board</th><th>M.Mob</th><th>F.Mob</th><th>Address</th><th>Area</th><th>Reference</th><th>Added By</th><th>Date</th><th>Action</th>';
+            html += '</tr></thead><tbody>';
+
+            pageData.forEach(s => {
+                const date = new Date(s.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+                html += '<tr>';
+                html += '<td>' + esc(s.name) + '</td>';
+                html += '<td>' + esc(s.std) + '</td>';
+                html += '<td>' + esc(s.school) + '</td>';
+                html += '<td>' + esc(s.board) + '</td>';
+                html += '<td>' + esc(s.m_mob_no) + '</td>';
+                html += '<td>' + esc(s.f_mob_no) + '</td>';
+                html += '<td>' + esc(s.address) + '</td>';
+                html += '<td>' + esc(s.area) + '</td>';
+                html += '<td>' + esc(s.reference) + '</td>';
+                html += '<td>' + esc(s.added_by) + '</td>';
+                html += '<td>' + date + '</td>';
+                html += '<td><button class="btn btn-danger btn-sm" onclick="deleteStudent(\'' + s._id + '\')">🗑</button></td>';
+                html += '</tr>';
+            });
+
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+
+            pagination.classList.remove('hidden');
+            pagination.style.display = 'flex';
+            document.getElementById('adminPageInfo').textContent = 'Page ' + adminPage + ' of ' + totalPages + ' (' + filteredStudents.length + ' records)';
+            document.getElementById('adminPrevPage').disabled = adminPage <= 1;
+            document.getElementById('adminNextPage').disabled = adminPage >= totalPages;
+        }
+
+        document.getElementById('adminPrevPage').addEventListener('click', () => { if (adminPage > 1) { adminPage--; renderStudents(); } });
+        document.getElementById('adminNextPage').addEventListener('click', () => {
+            const totalPages = Math.ceil(filteredStudents.length / adminPerPage);
+            if (adminPage < totalPages) { adminPage++; renderStudents(); }
+        });
+
+        function esc(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+
+        // --- Search ---
+        document.getElementById('searchInput').addEventListener('input', function () {
+            const q = this.value.toLowerCase().trim();
+            if (!q) { filteredStudents = allStudents; } else {
+                filteredStudents = allStudents.filter(s =>
+                    (s.name && s.name.toLowerCase().includes(q)) ||
+                    (s.school && s.school.toLowerCase().includes(q)) ||
+                    (s.area && s.area.toLowerCase().includes(q)) ||
+                    (s.added_by && s.added_by.toLowerCase().includes(q)) ||
+                    (s.std && s.std.toLowerCase().includes(q)) ||
+                    (s.reference && s.reference.toLowerCase().includes(q))
+                );
+            }
+            adminPage = 1;
+            renderStudents();
+        });
+
+        // --- Delete Student ---
+        async function deleteStudent(id) {
+            if (!confirm('Are you sure you want to delete this student record?')) return;
+            try {
+                await fetch('/api/students/' + id, { method: 'DELETE' });
+                await loadAllData();
+                await loadStats();
+            } catch { }
+        }
+
+        // --- Load Users ---
+        async function loadUsers() {
+            try {
+                const res = await fetch('/api/admin/users');
+                const users = await res.json();
+                const container = document.getElementById('usersContainer');
+
+                if (users.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="icon">👤</div><p>No users yet.</p></div>';
+                    return;
+                }
+
+                let html = '<div class="table-wrapper"><table><thead><tr>';
+                html += '<th>Username</th><th>Branch</th><th>Role</th><th>Entries</th><th>Action</th>';
+                html += '</tr></thead><tbody>';
+
+                users.forEach(u => {
+                    const roleBadge = u.role === 'admin'
+                        ? '<span class="badge badge-admin">Admin</span>'
+                        : '<span class="badge badge-user">User</span>';
+                    html += '<tr>';
+                    html += '<td>' + esc(u.username) + '</td>';
+                    html += '<td>' + esc(u.user_branch) + '</td>';
+                    html += '<td>' + roleBadge + '</td>';
+                    html += '<td>' + (u.studentCount || 0) + '</td>';
+                    html += '<td>';
+                    if (u.role !== 'admin') {
+                        html += '<button class="btn btn-danger btn-sm" onclick="deleteUser(\'' + u._id + '\')">🗑</button>';
+                    } else {
+                        html += '<span style="color:var(--text-muted);font-size:0.8rem;">Protected</span>';
+                    }
+                    html += '</td>';
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table></div>';
+                container.innerHTML = html;
+            } catch { }
+        }
+
+        // --- Delete User ---
+        async function deleteUser(id) {
+            if (!confirm('Are you sure you want to delete this user?')) return;
+            try {
+                const res = await fetch('/api/admin/users/' + id, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok) return alert(data.error);
+                await loadUsers();
+                await loadStats();
+            } catch { }
+        }
+
+        // --- Create User ---
+        document.getElementById('createUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const loading = document.getElementById('loading');
+            loading.classList.add('active');
+
+            const body = {
+                username: document.getElementById('newUsername').value.trim(),
+                password: document.getElementById('newPassword').value,
+                user_branch: document.getElementById('newBranch').value.trim()
+            };
+
+            try {
+                const res = await fetch('/api/admin/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    showAlert('createAlert', 'User "' + body.username + '" created successfully! ✨', 'success');
+                    document.getElementById('createUserForm').reset();
+                    await loadUsers();
+                    await loadStats();
+                } else {
+                    showAlert('createAlert', data.error || 'Failed to create user', 'error');
+                }
+            } catch {
+                showAlert('createAlert', 'Connection error. Please try again.', 'error');
+            } finally {
+                loading.classList.remove('active');
+            }
+        });
+
+        // --- Export to Excel ---
+        function exportToExcel() {
+            if (!allStudents || allStudents.length === 0) {
+                alert('No data to export!');
+                return;
+            }
+
+            const rows = allStudents.map((s, i) => ({
+                'Sr No': i + 1,
+                'Name': s.name || '',
+                'Std': s.std || '',
+                'School': s.school || '',
+                'Board': s.board || '',
+                'Mother Mobile': s.m_mob_no || '',
+                'Father Mobile': s.f_mob_no || '',
+                'Address': s.address || '',
+                'Area': s.area || '',
+                'Reference': s.reference || '',
+                'Added By': s.added_by || '',
+                'Date': s.createdAt ? new Date(s.createdAt).toLocaleDateString('en-IN') : ''
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(rows);
+
+            // Auto-set column widths
+            const colWidths = Object.keys(rows[0]).map(key => ({
+                wch: Math.max(key.length, ...rows.map(r => String(r[key]).length)) + 2
+            }));
+            ws['!cols'] = colWidths;
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Student Data');
+
+            const today = new Date().toISOString().slice(0, 10);
+            XLSX.writeFile(wb, '1000_address_data_' + today + '.xlsx');
+        }
+
+        // --- Logout ---
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/';
+        });
+
+        // --- Init ---
+        (async () => {
+            await checkAuth();
+            await loadStats();
+            await loadAllData();
+            await loadUsers();
+        })();
+    </script>
+</body>
+
+</html>

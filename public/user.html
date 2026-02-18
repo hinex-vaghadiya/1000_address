@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1000 Address — User Panel</title>
+    <meta name="description" content="Add and manage student data entries">
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+</head>
+
+<body>
+    <div class="bg-animation">
+        <div class="orb"></div>
+        <div class="orb"></div>
+        <div class="orb"></div>
+    </div>
+
+    <div class="container">
+        <!-- Navbar -->
+        <nav class="navbar">
+            <div class="brand">📋 1000 Address</div>
+            <div class="user-info">
+                <span class="user-badge" id="userBadge">—</span>
+                <button class="btn-logout" id="logoutBtn">Logout</button>
+            </div>
+        </nav>
+
+        <!-- Stats -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-value" id="myCount">0</div>
+                <div class="stat-label">My Entries</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="todayCount">0</div>
+                <div class="stat-label">Today</div>
+            </div>
+        </div>
+
+        <!-- Add Student Form -->
+        <div class="card">
+            <div class="card-title"><span class="icon">➕</span> Add Student Data</div>
+
+            <div id="formAlert" class="alert"></div>
+
+            <form id="studentForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="name">Student Name</label>
+                        <input type="text" id="name" placeholder="Full name">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="std">Standard</label>
+                        <select id="std">
+                            <option value="">Select Std</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                            <option value="9">9</option>
+                            <option value="10">10</option>
+                            <option value="11">11</option>
+                            <option value="11-Sci">11-Sci</option>
+                            <option value="11-Comm">11-Comm</option>
+                            <option value="12">12</option>
+                            <option value="12-Sci">12-Sci</option>
+                            <option value="12-Commerce">12-Commerce</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="school">School</label>
+                        <select id="school">
+                            <option value="">Select School</option>
+                            <option value="__add_new__">➕ Add New School...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="board">Board</label>
+                        <select id="board">
+                            <option value="">Select Board</option>
+                            <option value="CB">CB</option>
+                            <option value="GB">GB</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="m_mob_no">Mother's Mobile</label>
+                        <input type="tel" id="m_mob_no" placeholder="10-digit number" pattern="[0-9]{10}"
+                            maxlength="10">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="f_mob_no">Father's Mobile</label>
+                        <input type="tel" id="f_mob_no" placeholder="10-digit number" pattern="[0-9]{10}"
+                            maxlength="10">
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label for="address">Address</label>
+                        <input type="text" id="address" placeholder="Full address">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="area">Area</label>
+                        <select id="area">
+                            <option value="">Select Area</option>
+                            <option value="MV">MV</option>
+                            <option value="AB">AB</option>
+                            <option value="HB">HB</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reference_name">Reference Name</label>
+                        <input type="text" id="reference_name" placeholder="Enter reference name">
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label>Reference (Auto)</label>
+                        <input type="text" id="reference_preview" readonly disabled placeholder="Will auto-generate">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block mt-8" id="submitBtn">
+                    ✨ Add Student
+                </button>
+            </form>
+        </div>
+
+        <!-- Bulk Upload (hinex only) -->
+        <div class="card hidden" id="bulkUploadCard">
+            <div class="card-title"><span class="icon">📤</span> Bulk Upload from Excel</div>
+            <div id="bulkAlert" class="alert"></div>
+            <div class="form-group">
+                <label for="excelFile">Select Excel File (.xlsx / .xls)</label>
+                <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" style="padding:10px;">
+            </div>
+            <div id="bulkPreview" class="hidden" style="margin-top:16px;">
+                <p style="color:var(--text-secondary);margin-bottom:8px;"><strong id="previewCount">0</strong> records
+                    found in file:</p>
+                <div class="table-wrapper" style="max-height:250px;overflow-y:auto;" id="previewTable"></div>
+                <button class="btn btn-primary btn-block mt-16" id="bulkUploadBtn">📤 Upload All to Database</button>
+            </div>
+        </div>
+
+        <!-- Recent Entries -->
+        <div class="card">
+            <div class="card-title"><span class="icon">📊</span> My Recent Entries</div>
+            <div id="entriesContainer">
+                <div class="empty-state">
+                    <div class="icon">📭</div>
+                    <p>No entries yet. Add your first student above!</p>
+                </div>
+            </div>
+            <div id="paginationControls" class="hidden"
+                style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap;">
+                <button class="btn btn-secondary btn-sm" id="prevPage">⬅ Prev</button>
+                <span id="pageInfo" style="color:var(--text-secondary);font-size:0.85rem;">Page 1 of 1</span>
+                <button class="btn btn-secondary btn-sm" id="nextPage">Next ➡</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Student Modal -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal" style="max-width:500px;">
+            <h3>✏️ Edit Student</h3>
+            <div id="editAlert" class="alert"></div>
+            <input type="hidden" id="editId">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="editName">
+                </div>
+                <div class="form-group">
+                    <label>Std</label>
+                    <select id="editStd">
+                        <option value="">Select</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                        <option value="10">10</option>
+                        <option value="11">11</option>
+                        <option value="11-Sci">11-Sci</option>
+                        <option value="11-Comm">11-Comm</option>
+                        <option value="12">12</option>
+                        <option value="12-Sci">12-Sci</option>
+                        <option value="12-Commerce">12-Commerce</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>School</label>
+                    <input type="text" id="editSchool">
+                </div>
+                <div class="form-group">
+                    <label>Board</label>
+                    <select id="editBoard">
+                        <option value="CB">CB</option>
+                        <option value="GB">GB</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Mother Mobile</label>
+                    <input type="tel" id="editMMob" maxlength="10">
+                </div>
+                <div class="form-group">
+                    <label>Father Mobile</label>
+                    <input type="tel" id="editFMob" maxlength="10">
+                </div>
+                <div class="form-group full-width">
+                    <label>Address</label>
+                    <input type="text" id="editAddress">
+                </div>
+                <div class="form-group">
+                    <label>Area</label>
+                    <select id="editArea">
+                        <option value="MV">MV</option>
+                        <option value="AB">AB</option>
+                        <option value="HB">HB</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Reference Name</label>
+                    <input type="text" id="editRefName">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelEditBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveEditBtn">💾 Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add School Modal -->
+    <div class="modal-overlay" id="schoolModal">
+        <div class="modal">
+            <h3>➕ Add New School</h3>
+            <div class="form-group">
+                <label for="newSchoolName">School Name</label>
+                <input type="text" id="newSchoolName" placeholder="Enter school name">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelSchoolBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveSchoolBtn">Add School</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <script>
+        let currentUser = null;
+
+        // --- Auth Check ---
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/auth/me');
+                const data = await res.json();
+                if (!data.user || data.user.role !== 'user') {
+                    window.location.href = data.user && data.user.role === 'admin' ? '/admin' : '/';
+                    return;
+                }
+                currentUser = data.user;
+                document.getElementById('userBadge').textContent = currentUser.username + ' • ' + currentUser.user_branch;
+                // Show bulk upload card only for hinex
+                if (currentUser.username === 'hinex') {
+                    document.getElementById('bulkUploadCard').classList.remove('hidden');
+                }
+            } catch {
+                window.location.href = '/';
+            }
+        }
+
+        // --- Alert ---
+        function showAlert(msg, type) {
+            const el = document.getElementById('formAlert');
+            el.textContent = msg;
+            el.className = 'alert alert-' + type;
+            el.style.display = 'block';
+            setTimeout(() => { el.style.display = 'none'; }, 4000);
+        }
+
+        // --- Load Schools ---
+        async function loadSchools() {
+            try {
+                const res = await fetch('/api/schools');
+                const schools = await res.json();
+                const select = document.getElementById('school');
+                // Keep first two options
+                select.innerHTML = '<option value="">Select School</option><option value="__add_new__">➕ Add New School...</option>';
+                schools.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.name;
+                    opt.textContent = s.name;
+                    select.appendChild(opt);
+                });
+            } catch { }
+        }
+
+        // --- Load My Entries (Paginated) ---
+        let allMyStudents = [];
+        let currentPage = 1;
+        const perPage = 10;
+
+        async function loadMyEntries() {
+            try {
+                const res = await fetch('/api/students/my');
+                const data = await res.json();
+
+                document.getElementById('myCount').textContent = data.count;
+
+                const today = new Date().toDateString();
+                const todayEntries = data.students.filter(s => new Date(s.createdAt).toDateString() === today);
+                document.getElementById('todayCount').textContent = todayEntries.length;
+
+                allMyStudents = data.students;
+                currentPage = 1;
+                renderPage();
+            } catch { }
+        }
+
+        function renderPage() {
+            const container = document.getElementById('entriesContainer');
+            const pagination = document.getElementById('paginationControls');
+
+            if (allMyStudents.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>No entries yet. Add your first student above!</p></div>';
+                pagination.classList.add('hidden');
+                return;
+            }
+
+            const totalPages = Math.ceil(allMyStudents.length / perPage);
+            const start = (currentPage - 1) * perPage;
+            const pageData = allMyStudents.slice(start, start + perPage);
+
+            let html = '<div class="table-wrapper"><table><thead><tr>';
+            html += '<th>Name</th><th>Std</th><th>School</th><th>Board</th><th>M.Mob</th><th>F.Mob</th><th>Address</th><th>Area</th><th>Date</th><th>Edit</th>';
+            html += '</tr></thead><tbody>';
+            pageData.forEach(s => {
+                const date = new Date(s.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+                html += '<tr>';
+                html += '<td>' + escapeHtml(s.name) + '</td>';
+                html += '<td>' + escapeHtml(s.std) + '</td>';
+                html += '<td>' + escapeHtml(s.school) + '</td>';
+                html += '<td>' + escapeHtml(s.board) + '</td>';
+                html += '<td>' + escapeHtml(s.m_mob_no) + '</td>';
+                html += '<td>' + escapeHtml(s.f_mob_no) + '</td>';
+                html += '<td>' + escapeHtml(s.address) + '</td>';
+                html += '<td>' + escapeHtml(s.area) + '</td>';
+                html += '<td>' + date + '</td>';
+                html += '<td><button class="btn btn-secondary btn-sm" onclick="openEdit(\'' + s._id + '\')">✏️</button></td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+
+            // Pagination controls
+            pagination.classList.remove('hidden');
+            pagination.style.display = 'flex';
+            document.getElementById('pageInfo').textContent = 'Page ' + currentPage + ' of ' + totalPages;
+            document.getElementById('prevPage').disabled = currentPage <= 1;
+            document.getElementById('nextPage').disabled = currentPage >= totalPages;
+        }
+
+        document.getElementById('prevPage').addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderPage(); } });
+        document.getElementById('nextPage').addEventListener('click', () => {
+            const totalPages = Math.ceil(allMyStudents.length / perPage);
+            if (currentPage < totalPages) { currentPage++; renderPage(); }
+        });
+
+        // --- Edit Student ---
+        function openEdit(id) {
+            const s = allMyStudents.find(x => x._id === id);
+            if (!s) return;
+            document.getElementById('editId').value = s._id;
+            document.getElementById('editName').value = s.name || '';
+            document.getElementById('editStd').value = s.std || '';
+            document.getElementById('editSchool').value = s.school || '';
+            document.getElementById('editBoard').value = (s.board || 'CB').toUpperCase();
+            document.getElementById('editMMob').value = s.m_mob_no || '';
+            document.getElementById('editFMob').value = s.f_mob_no || '';
+            document.getElementById('editAddress').value = s.address || '';
+            document.getElementById('editArea').value = (s.area || 'MV').toUpperCase();
+            // Extract reference name (remove branch suffix)
+            const ref = s.reference || '';
+            const dashIdx = ref.lastIndexOf('-');
+            document.getElementById('editRefName').value = dashIdx > 0 ? ref.substring(0, dashIdx) : ref;
+            document.getElementById('editModal').classList.add('active');
+        }
+
+        document.getElementById('cancelEditBtn').addEventListener('click', () => {
+            document.getElementById('editModal').classList.remove('active');
+        });
+
+        document.getElementById('saveEditBtn').addEventListener('click', async () => {
+            const id = document.getElementById('editId').value;
+            const loading = document.getElementById('loading');
+            loading.classList.add('active');
+
+            try {
+                const res = await fetch('/api/students/' + id, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: document.getElementById('editName').value.trim(),
+                        std: document.getElementById('editStd').value,
+                        school: document.getElementById('editSchool').value.trim(),
+                        board: document.getElementById('editBoard').value,
+                        m_mob_no: document.getElementById('editMMob').value.trim(),
+                        f_mob_no: document.getElementById('editFMob').value.trim(),
+                        address: document.getElementById('editAddress').value.trim(),
+                        area: document.getElementById('editArea').value,
+                        reference_name: document.getElementById('editRefName').value.trim()
+                    })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    document.getElementById('editModal').classList.remove('active');
+                    showAlert('Student updated successfully! ✨', 'success');
+                    await loadMyEntries();
+                } else {
+                    showAlert(data.error || 'Failed to update', 'error');
+                }
+            } catch {
+                showAlert('Connection error.', 'error');
+            } finally {
+                loading.classList.remove('active');
+            }
+        });
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // --- Reference Preview ---
+        document.getElementById('reference_name').addEventListener('input', function () {
+            const preview = document.getElementById('reference_preview');
+            if (this.value.trim() && currentUser) {
+                preview.value = this.value.trim() + '-' + currentUser.user_branch;
+            } else {
+                preview.value = '';
+            }
+        });
+
+        // --- School Dropdown ---
+        document.getElementById('school').addEventListener('change', function () {
+            if (this.value === '__add_new__') {
+                this.value = '';
+                document.getElementById('schoolModal').classList.add('active');
+                document.getElementById('newSchoolName').focus();
+            }
+        });
+
+        document.getElementById('cancelSchoolBtn').addEventListener('click', () => {
+            document.getElementById('schoolModal').classList.remove('active');
+            document.getElementById('newSchoolName').value = '';
+        });
+
+        document.getElementById('saveSchoolBtn').addEventListener('click', () => {
+            const name = document.getElementById('newSchoolName').value.trim();
+            if (!name) return;
+            const select = document.getElementById('school');
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            select.appendChild(opt);
+            select.value = name;
+            document.getElementById('schoolModal').classList.remove('active');
+            document.getElementById('newSchoolName').value = '';
+        });
+
+        // --- Submit Form ---
+        document.getElementById('studentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const loading = document.getElementById('loading');
+            loading.classList.add('active');
+
+            const body = {
+                name: document.getElementById('name').value.trim(),
+                std: document.getElementById('std').value,
+                school: document.getElementById('school').value,
+                board: document.getElementById('board').value,
+                m_mob_no: document.getElementById('m_mob_no').value.trim(),
+                f_mob_no: document.getElementById('f_mob_no').value.trim(),
+                address: document.getElementById('address').value.trim(),
+                area: document.getElementById('area').value.trim(),
+                reference_name: document.getElementById('reference_name').value.trim()
+            };
+
+            try {
+                const res = await fetch('/api/students', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    showAlert('Student added successfully! ✨', 'success');
+                    document.getElementById('studentForm').reset();
+                    document.getElementById('reference_preview').value = '';
+                    await loadMyEntries();
+                } else {
+                    showAlert(data.error || 'Failed to add student', 'error');
+                }
+            } catch {
+                showAlert('Connection error. Please try again.', 'error');
+            } finally {
+                loading.classList.remove('active');
+            }
+        });
+
+        // --- Bulk Upload Logic ---
+        let bulkData = [];
+
+        document.getElementById('excelFile').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (evt) {
+                try {
+                    const wb = XLSX.read(evt.target.result, { type: 'binary' });
+                    const ws = wb.Sheets[wb.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+                    // Normalize column headers: lowercase, replace spaces with underscores
+                    function getVal(row, ...keys) {
+                        for (const k of keys) {
+                            if (row[k] !== undefined && row[k] !== '') return row[k];
+                        }
+                        // Try normalized: check all row keys
+                        const normalizedKeys = keys.map(k => k.toLowerCase().replace(/[\s_]+/g, ''));
+                        for (const rk of Object.keys(row)) {
+                            const nrk = rk.toLowerCase().replace(/[\s_]+/g, '');
+                            if (normalizedKeys.includes(nrk) && row[rk] !== undefined && row[rk] !== '') return row[rk];
+                        }
+                        return '';
+                    }
+
+                    // Map Excel columns to our fields
+                    bulkData = jsonData.map(row => ({
+                        name: getVal(row, 'name', 'Name').toString().trim(),
+                        std: getVal(row, 'std', 'Std', 'STD').toString().trim(),
+                        school: getVal(row, 'school', 'School').toString().trim(),
+                        board: getVal(row, 'board', 'Board').toString().trim().toUpperCase(),
+                        m_mob_no: getVal(row, 'm_mob_no', 'm mob no', 'M Mob No', 'mmobno').toString().trim(),
+                        f_mob_no: getVal(row, 'f_mob_no', 'f mob no', 'F Mob No', 'fmobno').toString().trim(),
+                        address: getVal(row, 'address', 'Address').toString().trim(),
+                        area: getVal(row, 'area', 'Area').toString().trim().toUpperCase(),
+                        reference: getVal(row, 'reference', 'Reference').toString().trim()
+                    })).filter(r => r.name);
+
+                    document.getElementById('previewCount').textContent = bulkData.length;
+
+                    // Build preview table
+                    let html = '<table><thead><tr><th>#</th><th>Name</th><th>Std</th><th>School</th><th>Board</th><th>Area</th><th>Reference</th></tr></thead><tbody>';
+                    bulkData.slice(0, 20).forEach((s, i) => {
+                        html += '<tr>';
+                        html += '<td>' + (i + 1) + '</td>';
+                        html += '<td>' + escapeHtml(s.name) + '</td>';
+                        html += '<td>' + escapeHtml(s.std) + '</td>';
+                        html += '<td>' + escapeHtml(s.school) + '</td>';
+                        html += '<td>' + escapeHtml(s.board) + '</td>';
+                        html += '<td>' + escapeHtml(s.area) + '</td>';
+                        html += '<td>' + escapeHtml(s.reference) + '</td>';
+                        html += '</tr>';
+                    });
+                    if (bulkData.length > 20) {
+                        html += '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">... and ' + (bulkData.length - 20) + ' more rows</td></tr>';
+                    }
+                    html += '</tbody></table>';
+                    document.getElementById('previewTable').innerHTML = html;
+                    document.getElementById('bulkPreview').classList.remove('hidden');
+
+                } catch (err) {
+                    showBulkAlert('Error reading file: ' + err.message, 'error');
+                }
+            };
+            reader.readAsBinaryString(file);
+        });
+
+        document.getElementById('bulkUploadBtn').addEventListener('click', async () => {
+            if (bulkData.length === 0) return;
+            const loading = document.getElementById('loading');
+            loading.classList.add('active');
+
+            try {
+                const res = await fetch('/api/students/bulk', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ students: bulkData })
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    showBulkAlert('✅ ' + data.message, 'success');
+                    bulkData = [];
+                    document.getElementById('excelFile').value = '';
+                    document.getElementById('bulkPreview').classList.add('hidden');
+                    await loadMyEntries();
+                } else {
+                    showBulkAlert(data.error || 'Upload failed', 'error');
+                }
+            } catch {
+                showBulkAlert('Connection error. Please try again.', 'error');
+            } finally {
+                loading.classList.remove('active');
+            }
+        });
+
+        function showBulkAlert(msg, type) {
+            const el = document.getElementById('bulkAlert');
+            el.textContent = msg;
+            el.className = 'alert alert-' + type;
+            el.style.display = 'block';
+            setTimeout(() => { el.style.display = 'none'; }, 6000);
+        }
+
+        // --- Logout ---
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/';
+        });
+
+        // --- Init ---
+        (async () => {
+            await checkAuth();
+            await loadSchools();
+            await loadMyEntries();
+        })();
+    </script>
+</body>
+
+</html>

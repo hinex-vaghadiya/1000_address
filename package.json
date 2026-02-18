@@ -1,0 +1,21 @@
+{
+  "name": "100-address",
+  "version": "1.0.0",
+  "description": "Student Data Management Application with Admin and User Panels",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "connect-mongo": "^5.1.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "express-session": "^1.18.0",
+    "mongoose": "^8.5.0"
+  }
+}
