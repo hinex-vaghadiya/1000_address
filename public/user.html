@@ -132,7 +132,7 @@
             </form>
         </div>
 
-        <!-- Bulk Upload (hinex only) -->
+        <!-- Bulk Upload (hinex, jainam, jemish only) -->
         <div class="card hidden" id="bulkUploadCard">
             <div class="card-title"><span class="icon">📤</span> Bulk Upload from Excel</div>
             <div id="bulkAlert" class="alert"></div>
@@ -271,8 +271,8 @@
                 }
                 currentUser = data.user;
                 document.getElementById('userBadge').textContent = currentUser.username + ' • ' + currentUser.user_branch;
-                // Show bulk upload card only for hinex
-                if (currentUser.username === 'hinex') {
+                // Show bulk upload card only for hinex, jainam, jemish
+                if (['hinex', 'jainam', 'jemish'].includes(currentUser.username)) {
                     document.getElementById('bulkUploadCard').classList.remove('hidden');
                 }
             } catch {

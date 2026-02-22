@@ -108,11 +108,11 @@ router.delete('/:id', isAuthenticated, async (req, res) => {
     }
 });
 
-// Bulk upload (hinex user only)
+// Bulk upload (hinex, jainam, jemish only)
 router.post('/bulk', isAuthenticated, async (req, res) => {
     try {
-        if (req.session.user.username !== 'jainam') {
-            return res.status(403).json({ error: 'Bulk upload is restricted to hinex user only' });
+        if (!['hinex', 'jainam', 'jemish'].includes(req.session.user.username)) {
+            return res.status(403).json({ error: 'Bulk upload is restricted to specific users only' });
         }
 
         const { students } = req.body;
