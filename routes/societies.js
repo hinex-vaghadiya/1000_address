@@ -14,6 +14,54 @@ router.get('/', isAuthenticated, async (req, res) => {
     }
 });
 
+// Extract data from Google Maps URL (Handles short links like maps.app.goo.gl)
+router.post('/extract-url', isAuthenticated, async (req, res) => {
+    try {
+        const { url } = req.body;
+        if (!url) return res.status(400).json({ error: 'URL is required' });
+
+        let finalUrl = url;
+        // If it's a short URL, resolve the redirect
+        if (url.includes('maps.app.goo.gl') || url.includes('g.page')) {
+            // Using dynamic import for node-fetch if global fetch is not fully available in older node versions,
+            // but Node 18+ has global fetch. Let's use global fetch.
+            const fetchRes = await fetch(url, { redirect: 'manual' });
+            if (fetchRes.status >= 300 && fetchRes.status < 400) {
+                finalUrl = fetchRes.headers.get('location') || url;
+            } else if (fetchRes.url && fetchRes.url !== url) {
+                finalUrl = fetchRes.url;
+            }
+        }
+
+        const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+        const match = finalUrl.match(regex);
+        let lat = null;
+        let lng = null;
+        let name = null;
+        let address = null;
+
+        if (match && match.length >= 3) {
+            lat = parseFloat(match[1]);
+            lng = parseFloat(match[2]);
+            
+            const nameMatch = finalUrl.match(/\/place\/([^\/]+)/);
+            if (nameMatch) {
+                const fullText = decodeURIComponent(nameMatch[1].replace(/\+/g, ' '));
+                const parts = fullText.split(',');
+                name = parts[0].trim();
+                if (parts.length > 1) {
+                    address = parts.slice(1).join(',').trim();
+                }
+            }
+        }
+
+        res.json({ lat, lng, name, address, finalUrl });
+    } catch (err) {
+        console.error('URL Extraction Error:', err);
+        res.status(500).json({ error: 'Failed to extract URL' });
+    }
+});
+
 // Get map data: societies with student counts
 router.get('/map-data', isAuthenticated, async (req, res) => {
     try {

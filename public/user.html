@@ -165,7 +165,8 @@
                 </div>
                 <div class="form-group full-width">
                     <label for="gmapsLink">📍 Paste Google Maps Link (Extracts coordinates automatically)</label>
-                    <input type="text" id="gmapsLink" placeholder="e.g. https://www.google.com/maps/place/.../@21.2369,72.8772,17z/..." autocomplete="off">
+                    <input type="text" id="gmapsLink" placeholder="e.g. https://maps.app.goo.gl/... or full url" autocomplete="off">
+                    <small style="color: var(--text-secondary); display: none; margin-top: 6px; font-weight: 600;" id="gmapsLoading">⏳ Extracting location data...</small>
                     <small style="color: var(--success); display: none; margin-top: 6px; font-weight: 600;" id="gmapsSuccess">✅ Coordinates extracted successfully!</small>
                 </div>
                 <div class="form-grid">
@@ -952,56 +953,72 @@
         // --- Google Maps Link Parsing ---
         const gmapsLinkInput = document.getElementById('gmapsLink');
         const gmapsSuccess = document.getElementById('gmapsSuccess');
+        const gmapsLoading = document.getElementById('gmapsLoading');
+        let gmapsExtractTimer = null;
 
         gmapsLinkInput.addEventListener('input', function() {
             const url = this.value.trim();
             gmapsSuccess.style.display = 'none';
+            gmapsLoading.style.display = 'none';
             if (!url) return;
 
-            // Regex to find @lat,lng in maps URL
-            const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-            const match = url.match(regex);
-            
-            if (match && match.length >= 3) {
-                const lat = match[1];
-                const lng = match[2];
-                document.getElementById('societyLat').value = lat;
-                document.getElementById('societyLng').value = lng;
-                gmapsSuccess.style.display = 'block';
+            clearTimeout(gmapsExtractTimer);
+            gmapsExtractTimer = setTimeout(async () => {
+                gmapsLoading.style.display = 'block';
                 
-                // Try to extract name and address from the URL path
-                const nameMatch = url.match(/\/place\/([^\/]+)/);
-                if (nameMatch) {
-                    const fullText = decodeURIComponent(nameMatch[1].replace(/\+/g, ' '));
-                    const parts = fullText.split(',');
+                try {
+                    const res = await fetch('/api/societies/extract-url', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url })
+                    });
                     
-                    if (!document.getElementById('societyName').value) {
-                        document.getElementById('societyName').value = parts[0].trim();
-                    }
-                    
-                    if (!document.getElementById('societyAddress').value && parts.length > 1) {
-                        document.getElementById('societyAddress').value = parts.slice(1).join(',').trim();
-                    }
-                } else {
-                    // Fallback to reverse geocoding if URL doesn't have name
-                    if (!document.getElementById('societyName').value || !document.getElementById('societyAddress').value) {
-                        fetch(`https://photon.komoot.io/reverse?lon=${lng}&lat=${lat}`)
-                            .then(res => res.json())
-                            .then(data => {
-                                if (data.features && data.features.length > 0) {
-                                    const props = data.features[0].properties;
-                                    if (!document.getElementById('societyName').value) {
-                                        document.getElementById('societyName').value = props.name || props.street || 'Unknown';
+                    const data = await res.json();
+                    gmapsLoading.style.display = 'none';
+
+                    if (data.lat && data.lng) {
+                        document.getElementById('societyLat').value = data.lat;
+                        document.getElementById('societyLng').value = data.lng;
+                        gmapsSuccess.style.display = 'block';
+
+                        if (data.name && !document.getElementById('societyName').value) {
+                            document.getElementById('societyName').value = data.name;
+                        }
+                        if (data.address && !document.getElementById('societyAddress').value) {
+                            document.getElementById('societyAddress').value = data.address;
+                        }
+
+                        // Fallback to reverse geocoding if URL didn't have a name
+                        if (!document.getElementById('societyName').value || !document.getElementById('societyAddress').value) {
+                            fetch(`https://photon.komoot.io/reverse?lon=${data.lng}&lat=${data.lat}`)
+                                .then(r => r.json())
+                                .then(pData => {
+                                    if (pData.features && pData.features.length > 0) {
+                                        const props = pData.features[0].properties;
+                                        if (!document.getElementById('societyName').value) {
+                                            document.getElementById('societyName').value = props.name || props.street || 'Unknown';
+                                        }
+                                        if (!document.getElementById('societyAddress').value) {
+                                            const addrParts = [props.street, props.city, props.district, props.state].filter(Boolean);
+                                            document.getElementById('societyAddress').value = addrParts.join(', ');
+                                        }
                                     }
-                                    if (!document.getElementById('societyAddress').value) {
-                                        const addrParts = [props.street, props.city, props.district, props.state].filter(Boolean);
-                                        document.getElementById('societyAddress').value = addrParts.join(', ');
-                                    }
-                                }
-                            }).catch(() => {});
+                                }).catch(() => {});
+                        }
+                    } else {
+                        gmapsLoading.textContent = '❌ Could not extract coordinates from URL';
+                        gmapsLoading.style.color = 'var(--danger)';
+                        gmapsLoading.style.display = 'block';
+                        setTimeout(() => { 
+                            gmapsLoading.style.display = 'none';
+                            gmapsLoading.textContent = '⏳ Extracting location data...';
+                            gmapsLoading.style.color = 'var(--text-secondary)';
+                        }, 4000);
                     }
+                } catch {
+                    gmapsLoading.style.display = 'none';
                 }
-            }
+            }, 800); // Wait user stop typing
         });
 
         document.getElementById('societyForm').addEventListener('submit', async (e) => {
