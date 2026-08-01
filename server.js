@@ -52,6 +52,7 @@ app.use('/api/admin', require('./routes/admin'));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/user', (req, res) => res.sendFile(path.join(__dirname, 'public', 'user.html')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+app.get('/map', (req, res) => res.sendFile(path.join(__dirname, 'public', 'map.html')));
 
 // --- Seed Admin User ---
 const User = require('./models/User');

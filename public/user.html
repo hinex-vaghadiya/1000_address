@@ -22,6 +22,7 @@
         <nav class="navbar">
             <div class="brand">📋 1000 Address</div>
             <div class="user-info">
+                <a href="/map" class="btn btn-secondary btn-sm" style="text-decoration:none;border-radius:20px;padding:6px 16px;">🗺️ Map View</a>
                 <span class="user-badge" id="userBadge">—</span>
                 <button class="btn-logout" id="logoutBtn">Logout</button>
             </div>
@@ -152,16 +153,26 @@
             <div class="card-title"><span class="icon">🏘️</span> Manage Societies</div>
             <div id="societyAlert" class="alert"></div>
             <form id="societyForm">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="societyName">Society Name</label>
-                        <input type="text" id="societyName" placeholder="e.g. Shreeji Residency">
-                    </div>
-                    <div class="form-group">
-                        <label for="societyAddress">Society Address</label>
-                        <input type="text" id="societyAddress" placeholder="e.g. Near Manjalpur Circle, Vadodara">
+                <div class="form-group full-width">
+                    <label for="placeSearch">🔍 Search Place (Google Maps style)</label>
+                    <div class="searchable-dropdown" id="placeSearchDropdown">
+                        <input type="text" id="placeSearch" placeholder="Type society/place name... e.g. Shreeji Residency Surat" autocomplete="off">
+                        <div class="dropdown-list" id="placeSearchResults"></div>
                     </div>
                 </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Society Name (Auto-filled)</label>
+                        <input type="text" id="societyName" placeholder="Will auto-fill from search" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Address (Auto-filled)</label>
+                        <input type="text" id="societyAddress" placeholder="Will auto-fill from search" readonly>
+                    </div>
+                </div>
+                <input type="hidden" id="societyLat">
+                <input type="hidden" id="societyLng">
+                <input type="hidden" id="societyPlaceId">
                 <button type="submit" class="btn btn-primary btn-block mt-8">🏘️ Add Society</button>
             </form>
             <div id="societiesContainer" style="margin-top:20px;"></div>
@@ -864,22 +875,95 @@
             setTimeout(() => { el.style.display = 'none'; }, 4000);
         }
 
+        // --- Photon Place Search ---
+        let placeSearchTimer = null;
+        const placeSearchInput = document.getElementById('placeSearch');
+        const placeSearchResults = document.getElementById('placeSearchResults');
+
+        placeSearchInput.addEventListener('input', function() {
+            const q = this.value.trim();
+            clearTimeout(placeSearchTimer);
+
+            if (q.length < 3) {
+                placeSearchResults.classList.remove('open');
+                return;
+            }
+
+            placeSearchTimer = setTimeout(async () => {
+                try {
+                    // Bias search towards Surat area
+                    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=21.1702&lon=72.8311&limit=6&lang=en`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+
+                    if (!data.features || data.features.length === 0) {
+                        placeSearchResults.innerHTML = '<div class="dropdown-no-results">No places found. Try different keywords.</div>';
+                        placeSearchResults.classList.add('open');
+                        return;
+                    }
+
+                    placeSearchResults.innerHTML = data.features.map((f, idx) => {
+                        const props = f.properties || {};
+                        const name = props.name || 'Unknown';
+                        const parts = [props.street, props.city, props.district, props.state].filter(Boolean);
+                        const addr = parts.join(', ') || props.label || '';
+                        const coords = f.geometry ? f.geometry.coordinates : [0, 0];
+                        return `<div class="dropdown-item" data-idx="${idx}" data-name="${escapeHtml(name)}" data-addr="${escapeHtml(addr)}" data-lat="${coords[1]}" data-lng="${coords[0]}">
+                            <div class="dropdown-item-name">📍 ${escapeHtml(name)}</div>
+                            <div class="dropdown-item-addr">${escapeHtml(addr)}</div>
+                        </div>`;
+                    }).join('');
+
+                    placeSearchResults.classList.add('open');
+
+                    // Click handlers
+                    placeSearchResults.querySelectorAll('.dropdown-item').forEach(item => {
+                        item.addEventListener('click', () => {
+                            document.getElementById('societyName').value = item.dataset.name;
+                            document.getElementById('societyAddress').value = item.dataset.addr;
+                            document.getElementById('societyLat').value = item.dataset.lat;
+                            document.getElementById('societyLng').value = item.dataset.lng;
+                            placeSearchInput.value = item.dataset.name;
+                            placeSearchResults.classList.remove('open');
+                        });
+                    });
+                } catch {
+                    placeSearchResults.innerHTML = '<div class="dropdown-no-results">Search failed. Try again.</div>';
+                    placeSearchResults.classList.add('open');
+                }
+            }, 400); // 400ms debounce
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!document.getElementById('placeSearchDropdown').contains(e.target)) {
+                placeSearchResults.classList.remove('open');
+            }
+        });
+
         document.getElementById('societyForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const name = document.getElementById('societyName').value.trim();
             const address = document.getElementById('societyAddress').value.trim();
-            if (!name || !address) { showSocietyAlert('Both name and address are required', 'error'); return; }
+            const latitude = parseFloat(document.getElementById('societyLat').value) || null;
+            const longitude = parseFloat(document.getElementById('societyLng').value) || null;
+
+            if (!name || !address) { showSocietyAlert('Please search and select a place first', 'error'); return; }
 
             try {
                 const res = await fetch('/api/societies', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, address })
+                    body: JSON.stringify({ name, address, latitude, longitude })
                 });
                 const data = await res.json();
                 if (res.ok) {
                     showSocietyAlert('Society added! 🏘️', 'success');
                     document.getElementById('societyForm').reset();
+                    document.getElementById('societyName').value = '';
+                    document.getElementById('societyAddress').value = '';
+                    document.getElementById('societyLat').value = '';
+                    document.getElementById('societyLng').value = '';
                     await loadSocieties();
                 } else {
                     showSocietyAlert(data.error || 'Failed', 'error');
