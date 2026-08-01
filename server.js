@@ -45,6 +45,7 @@ app.use(session({
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/students', require('./routes/students'));
 app.use('/api/schools', require('./routes/schools'));
+app.use('/api/societies', require('./routes/societies'));
 app.use('/api/admin', require('./routes/admin'));
 
 // Serve pages

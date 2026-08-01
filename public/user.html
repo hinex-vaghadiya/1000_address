@@ -100,9 +100,24 @@
                             maxlength="10">
                     </div>
 
+                    <div class="form-group">
+                        <label for="house_no">House / Flat No</label>
+                        <input type="text" id="house_no" placeholder="e.g. B-201">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="society_search">Society</label>
+                        <div class="searchable-dropdown" id="societyDropdown">
+                            <input type="text" id="society_search" placeholder="Search society..." autocomplete="off">
+                            <div class="dropdown-list" id="society_dropdown_list"></div>
+                            <input type="hidden" id="selected_society_name">
+                            <input type="hidden" id="selected_society_addr">
+                        </div>
+                    </div>
+
                     <div class="form-group full-width">
-                        <label for="address">Address</label>
-                        <input type="text" id="address" placeholder="Full address">
+                        <label>Address (Auto)</label>
+                        <input type="text" id="address_preview" readonly disabled placeholder="House No, Society Name, Society Address">
                     </div>
 
                     <div class="form-group">
@@ -130,6 +145,26 @@
                     ✨ Add Student
                 </button>
             </form>
+        </div>
+
+        <!-- Manage Societies -->
+        <div class="card">
+            <div class="card-title"><span class="icon">🏘️</span> Manage Societies</div>
+            <div id="societyAlert" class="alert"></div>
+            <form id="societyForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="societyName">Society Name</label>
+                        <input type="text" id="societyName" placeholder="e.g. Shreeji Residency">
+                    </div>
+                    <div class="form-group">
+                        <label for="societyAddress">Society Address</label>
+                        <input type="text" id="societyAddress" placeholder="e.g. Near Manjalpur Circle, Vadodara">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block mt-8">🏘️ Add Society</button>
+            </form>
+            <div id="societiesContainer" style="margin-top:20px;"></div>
         </div>
 
         <!-- Bulk Upload (hinex, jainam, jemish only) -->
@@ -214,9 +249,22 @@
                     <label>Father Mobile</label>
                     <input type="tel" id="editFMob" maxlength="10">
                 </div>
+                <div class="form-group">
+                    <label>House / Flat No</label>
+                    <input type="text" id="editHouseNo">
+                </div>
+                <div class="form-group">
+                    <label>Society</label>
+                    <div class="searchable-dropdown" id="editSocietyDropdown">
+                        <input type="text" id="edit_society_search" placeholder="Search society..." autocomplete="off">
+                        <div class="dropdown-list" id="edit_society_dropdown_list"></div>
+                        <input type="hidden" id="edit_selected_society_name">
+                        <input type="hidden" id="edit_selected_society_addr">
+                    </div>
+                </div>
                 <div class="form-group full-width">
-                    <label>Address</label>
-                    <input type="text" id="editAddress">
+                    <label>Address (Auto)</label>
+                    <input type="text" id="editAddressPreview" readonly disabled>
                 </div>
                 <div class="form-group">
                     <label>Area</label>
@@ -253,12 +301,33 @@
         </div>
     </div>
 
+    <!-- Edit Society Modal -->
+    <div class="modal-overlay" id="editSocietyModal">
+        <div class="modal">
+            <h3>✏️ Edit Society</h3>
+            <input type="hidden" id="editSocietyId">
+            <div class="form-group">
+                <label>Society Name</label>
+                <input type="text" id="editSocietyName">
+            </div>
+            <div class="form-group">
+                <label>Society Address</label>
+                <input type="text" id="editSocietyAddress">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelEditSocietyBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveEditSocietyBtn">💾 Save</button>
+            </div>
+        </div>
+    </div>
+
     <div class="loading-overlay" id="loading">
         <div class="spinner"></div>
     </div>
 
     <script>
         let currentUser = null;
+        let allSocieties = [];
 
         // --- Auth Check ---
         async function checkAuth() {
@@ -305,6 +374,102 @@
                 });
             } catch { }
         }
+
+        // --- Load Societies ---
+        async function loadSocieties() {
+            try {
+                const res = await fetch('/api/societies');
+                allSocieties = await res.json();
+                renderSocietiesTable();
+            } catch { }
+        }
+
+        // --- Searchable Dropdown Helper ---
+        function setupSocietyDropdown(searchId, listId, nameHiddenId, addrHiddenId, onSelect) {
+            const searchInput = document.getElementById(searchId);
+            const listEl = document.getElementById(listId);
+
+            searchInput.addEventListener('focus', () => {
+                renderDropdownItems(searchId, listId, nameHiddenId, addrHiddenId, onSelect);
+                listEl.classList.add('open');
+            });
+
+            searchInput.addEventListener('input', () => {
+                // Clear selection when user types
+                document.getElementById(nameHiddenId).value = '';
+                document.getElementById(addrHiddenId).value = '';
+                renderDropdownItems(searchId, listId, nameHiddenId, addrHiddenId, onSelect);
+                listEl.classList.add('open');
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!searchInput.parentElement.contains(e.target)) {
+                    listEl.classList.remove('open');
+                }
+            });
+        }
+
+        function renderDropdownItems(searchId, listId, nameHiddenId, addrHiddenId, onSelect) {
+            const q = document.getElementById(searchId).value.toLowerCase().trim();
+            const listEl = document.getElementById(listId);
+            const filtered = allSocieties.filter(s =>
+                s.name.toLowerCase().includes(q) || s.address.toLowerCase().includes(q)
+            );
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = '<div class="dropdown-no-results">No societies found</div>';
+                return;
+            }
+
+            listEl.innerHTML = filtered.map(s =>
+                '<div class="dropdown-item" data-name="' + escapeHtml(s.name) + '" data-addr="' + escapeHtml(s.address) + '">' +
+                '<div class="dropdown-item-name">' + escapeHtml(s.name) + '</div>' +
+                '<div class="dropdown-item-addr">' + escapeHtml(s.address) + '</div>' +
+                '</div>'
+            ).join('');
+
+            listEl.querySelectorAll('.dropdown-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const name = item.dataset.name;
+                    const addr = item.dataset.addr;
+                    document.getElementById(searchId).value = name;
+                    document.getElementById(nameHiddenId).value = name;
+                    document.getElementById(addrHiddenId).value = addr;
+                    listEl.classList.remove('open');
+                    if (onSelect) onSelect(name, addr);
+                });
+            });
+        }
+
+        // --- Compose Address ---
+        function composeAddress(houseNo, societyName, societyAddr) {
+            const parts = [houseNo, societyName, societyAddr].filter(p => p && p.trim());
+            return parts.join(', ');
+        }
+
+        // --- Address Preview (Add Form) ---
+        function updateAddressPreview() {
+            const houseNo = document.getElementById('house_no').value.trim();
+            const sName = document.getElementById('selected_society_name').value;
+            const sAddr = document.getElementById('selected_society_addr').value;
+            document.getElementById('address_preview').value = composeAddress(houseNo, sName, sAddr);
+        }
+
+        document.getElementById('house_no').addEventListener('input', updateAddressPreview);
+
+        // --- Address Preview (Edit Form) ---
+        function updateEditAddressPreview() {
+            const houseNo = document.getElementById('editHouseNo').value.trim();
+            const sName = document.getElementById('edit_selected_society_name').value;
+            const sAddr = document.getElementById('edit_selected_society_addr').value;
+            document.getElementById('editAddressPreview').value = composeAddress(houseNo, sName, sAddr);
+        }
+
+        document.getElementById('editHouseNo').addEventListener('input', updateEditAddressPreview);
+
+        // Setup dropdowns
+        setupSocietyDropdown('society_search', 'society_dropdown_list', 'selected_society_name', 'selected_society_addr', () => updateAddressPreview());
+        setupSocietyDropdown('edit_society_search', 'edit_society_dropdown_list', 'edit_selected_society_name', 'edit_selected_society_addr', () => updateEditAddressPreview());
 
         // --- Load My Entries (Paginated) ---
         let allMyStudents = [];
@@ -405,7 +570,25 @@
             document.getElementById('editBoard').value = (s.board || 'CB').toUpperCase();
             document.getElementById('editMMob').value = s.m_mob_no || '';
             document.getElementById('editFMob').value = s.f_mob_no || '';
-            document.getElementById('editAddress').value = s.address || '';
+
+            // Parse address back: try to match "HouseNo, SocietyName, SocietyAddr"
+            const addr = s.address || '';
+            let editHouse = '', editSocName = '', editSocAddr = '';
+            const matched = allSocieties.find(soc => addr.includes(soc.name));
+            if (matched) {
+                const socStart = addr.indexOf(matched.name);
+                editHouse = addr.substring(0, socStart).replace(/,\s*$/, '').trim();
+                editSocName = matched.name;
+                editSocAddr = matched.address;
+            } else {
+                editHouse = addr;
+            }
+            document.getElementById('editHouseNo').value = editHouse;
+            document.getElementById('edit_society_search').value = editSocName;
+            document.getElementById('edit_selected_society_name').value = editSocName;
+            document.getElementById('edit_selected_society_addr').value = editSocAddr;
+            updateEditAddressPreview();
+
             document.getElementById('editArea').value = (s.area || 'MV').toUpperCase();
             // Extract reference name (remove branch suffix)
             const ref = s.reference || '';
@@ -434,7 +617,7 @@
                         board: document.getElementById('editBoard').value,
                         m_mob_no: document.getElementById('editMMob').value.trim(),
                         f_mob_no: document.getElementById('editFMob').value.trim(),
-                        address: document.getElementById('editAddress').value.trim(),
+                        address: document.getElementById('editAddressPreview').value.trim(),
                         area: document.getElementById('editArea').value,
                         reference_name: document.getElementById('editRefName').value.trim()
                     })
@@ -509,7 +692,7 @@
                 board: document.getElementById('board').value,
                 m_mob_no: document.getElementById('m_mob_no').value.trim(),
                 f_mob_no: document.getElementById('f_mob_no').value.trim(),
-                address: document.getElementById('address').value.trim(),
+                address: document.getElementById('address_preview').value.trim(),
                 area: document.getElementById('area').value.trim(),
                 reference_name: document.getElementById('reference_name').value.trim()
             };
@@ -526,6 +709,10 @@
                     showAlert('Student added successfully! ✨', 'success');
                     document.getElementById('studentForm').reset();
                     document.getElementById('reference_preview').value = '';
+                    document.getElementById('address_preview').value = '';
+                    document.getElementById('selected_society_name').value = '';
+                    document.getElementById('selected_society_addr').value = '';
+                    document.getElementById('society_search').value = '';
                     await loadMyEntries();
                 } else {
                     showAlert(data.error || 'Failed to add student', 'error');
@@ -650,10 +837,106 @@
             window.location.href = '/';
         });
 
+        // --- Society CRUD ---
+        function renderSocietiesTable() {
+            const container = document.getElementById('societiesContainer');
+            if (allSocieties.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">🏘️</div><p>No societies added yet.</p></div>';
+                return;
+            }
+            let html = '<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Address</th><th>Actions</th></tr></thead><tbody>';
+            allSocieties.forEach(s => {
+                html += '<tr>';
+                html += '<td>' + escapeHtml(s.name) + '</td>';
+                html += '<td>' + escapeHtml(s.address) + '</td>';
+                html += '<td style="white-space:nowrap;"><button class="btn btn-secondary btn-sm" onclick="openEditSociety(\'' + s._id + '\')">✏️</button> <button class="btn btn-danger btn-sm" onclick="deleteSociety(\'' + s._id + '\')">🗑</button></td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        }
+
+        function showSocietyAlert(msg, type) {
+            const el = document.getElementById('societyAlert');
+            el.textContent = msg;
+            el.className = 'alert alert-' + type;
+            el.style.display = 'block';
+            setTimeout(() => { el.style.display = 'none'; }, 4000);
+        }
+
+        document.getElementById('societyForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('societyName').value.trim();
+            const address = document.getElementById('societyAddress').value.trim();
+            if (!name || !address) { showSocietyAlert('Both name and address are required', 'error'); return; }
+
+            try {
+                const res = await fetch('/api/societies', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, address })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showSocietyAlert('Society added! 🏘️', 'success');
+                    document.getElementById('societyForm').reset();
+                    await loadSocieties();
+                } else {
+                    showSocietyAlert(data.error || 'Failed', 'error');
+                }
+            } catch { showSocietyAlert('Connection error.', 'error'); }
+        });
+
+        async function deleteSociety(id) {
+            if (!confirm('Delete this society?')) return;
+            try {
+                const res = await fetch('/api/societies/' + id, { method: 'DELETE' });
+                if (res.ok) { showSocietyAlert('Society deleted! 🗑️', 'success'); await loadSocieties(); }
+                else { const d = await res.json(); showSocietyAlert(d.error || 'Failed', 'error'); }
+            } catch { showSocietyAlert('Connection error.', 'error'); }
+        }
+
+        function openEditSociety(id) {
+            const s = allSocieties.find(x => x._id === id);
+            if (!s) return;
+            document.getElementById('editSocietyId').value = s._id;
+            document.getElementById('editSocietyName').value = s.name;
+            document.getElementById('editSocietyAddress').value = s.address;
+            document.getElementById('editSocietyModal').classList.add('active');
+        }
+
+        document.getElementById('cancelEditSocietyBtn').addEventListener('click', () => {
+            document.getElementById('editSocietyModal').classList.remove('active');
+        });
+
+        document.getElementById('saveEditSocietyBtn').addEventListener('click', async () => {
+            const id = document.getElementById('editSocietyId').value;
+            const name = document.getElementById('editSocietyName').value.trim();
+            const address = document.getElementById('editSocietyAddress').value.trim();
+            if (!name || !address) return;
+
+            try {
+                const res = await fetch('/api/societies/' + id, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, address })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    document.getElementById('editSocietyModal').classList.remove('active');
+                    showSocietyAlert('Society updated! ✨', 'success');
+                    await loadSocieties();
+                } else {
+                    showSocietyAlert(data.error || 'Failed', 'error');
+                }
+            } catch { showSocietyAlert('Connection error.', 'error'); }
+        });
+
         // --- Init ---
         (async () => {
             await checkAuth();
             await loadSchools();
+            await loadSocieties();
             await loadMyEntries();
         })();
     </script>
