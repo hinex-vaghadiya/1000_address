@@ -336,6 +336,19 @@
                 }
             });
 
+            // Arc layer from org to societies
+            const arcLayer = new deck.ArcLayer({
+                id: 'society-arcs',
+                data: data,
+                getSourcePosition: d => [org.lng, org.lat],
+                getTargetPosition: d => [d.longitude, d.latitude],
+                getSourceColor: [108, 99, 255, 120],
+                getTargetColor: d => [...getColorRGB(d.studentCount), 120],
+                getWidth: 2,
+                getHeight: 0.5,
+                tilt: 15
+            });
+
             deckOverlay = new deck.DeckGL({
                 container: 'map3d',
                 mapStyle: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
@@ -347,7 +360,7 @@
                     bearing: -20
                 },
                 controller: true,
-                layers: [columnLayer, orgLayer]
+                layers: [arcLayer, columnLayer, orgLayer]
             });
         }
 

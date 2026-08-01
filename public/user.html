@@ -160,14 +160,22 @@
                         <div class="dropdown-list" id="placeSearchResults"></div>
                     </div>
                 </div>
+                <div class="form-group full-width" style="text-align: center; font-size: 0.85rem; color: var(--text-muted); margin: -4px 0 12px;">
+                    &mdash; OR &mdash;
+                </div>
+                <div class="form-group full-width">
+                    <label for="gmapsLink">📍 Paste Google Maps Link (Extracts coordinates automatically)</label>
+                    <input type="text" id="gmapsLink" placeholder="e.g. https://www.google.com/maps/place/.../@21.2369,72.8772,17z/..." autocomplete="off">
+                    <small style="color: var(--success); display: none; margin-top: 6px; font-weight: 600;" id="gmapsSuccess">✅ Coordinates extracted successfully!</small>
+                </div>
                 <div class="form-grid">
                     <div class="form-group">
-                        <label>Society Name (Auto-filled)</label>
-                        <input type="text" id="societyName" placeholder="Will auto-fill from search" readonly>
+                        <label>Society Name *</label>
+                        <input type="text" id="societyName" placeholder="Enter society name" required>
                     </div>
                     <div class="form-group">
-                        <label>Address (Auto-filled)</label>
-                        <input type="text" id="societyAddress" placeholder="Will auto-fill from search" readonly>
+                        <label>Address *</label>
+                        <input type="text" id="societyAddress" placeholder="Enter full address" required>
                     </div>
                 </div>
                 <input type="hidden" id="societyLat">
@@ -941,6 +949,32 @@
             }
         });
 
+        // --- Google Maps Link Parsing ---
+        const gmapsLinkInput = document.getElementById('gmapsLink');
+        const gmapsSuccess = document.getElementById('gmapsSuccess');
+
+        gmapsLinkInput.addEventListener('input', function() {
+            const url = this.value.trim();
+            gmapsSuccess.style.display = 'none';
+            if (!url) return;
+
+            // Regex to find @lat,lng in maps URL
+            const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+            const match = url.match(regex);
+            
+            if (match && match.length >= 3) {
+                document.getElementById('societyLat').value = match[1];
+                document.getElementById('societyLng').value = match[2];
+                gmapsSuccess.style.display = 'block';
+                // Try to extract a name if it's in the URL path
+                const nameMatch = url.match(/\/place\/([^\/]+)/);
+                if (nameMatch && !document.getElementById('societyName').value) {
+                    const extractedName = decodeURIComponent(nameMatch[1].replace(/\+/g, ' '));
+                    document.getElementById('societyName').value = extractedName;
+                }
+            }
+        });
+
         document.getElementById('societyForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const name = document.getElementById('societyName').value.trim();
@@ -948,7 +982,13 @@
             const latitude = parseFloat(document.getElementById('societyLat').value) || null;
             const longitude = parseFloat(document.getElementById('societyLng').value) || null;
 
-            if (!name || !address) { showSocietyAlert('Please search and select a place first', 'error'); return; }
+            if (!name || !address) { showSocietyAlert('Both name and address are required', 'error'); return; }
+
+            // If coordinates are missing, warn them but allow saving anyway
+            if (!latitude || !longitude) {
+                const proceed = confirm('No coordinates found. This society won\'t appear on the map. Do you want to proceed anyway?');
+                if (!proceed) return;
+            }
 
             try {
                 const res = await fetch('/api/societies', {
@@ -964,6 +1004,7 @@
                     document.getElementById('societyAddress').value = '';
                     document.getElementById('societyLat').value = '';
                     document.getElementById('societyLng').value = '';
+                    gmapsSuccess.style.display = 'none';
                     await loadSocieties();
                 } else {
                     showSocietyAlert(data.error || 'Failed', 'error');
