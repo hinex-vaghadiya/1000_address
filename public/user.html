@@ -963,14 +963,43 @@
             const match = url.match(regex);
             
             if (match && match.length >= 3) {
-                document.getElementById('societyLat').value = match[1];
-                document.getElementById('societyLng').value = match[2];
+                const lat = match[1];
+                const lng = match[2];
+                document.getElementById('societyLat').value = lat;
+                document.getElementById('societyLng').value = lng;
                 gmapsSuccess.style.display = 'block';
-                // Try to extract a name if it's in the URL path
+                
+                // Try to extract name and address from the URL path
                 const nameMatch = url.match(/\/place\/([^\/]+)/);
-                if (nameMatch && !document.getElementById('societyName').value) {
-                    const extractedName = decodeURIComponent(nameMatch[1].replace(/\+/g, ' '));
-                    document.getElementById('societyName').value = extractedName;
+                if (nameMatch) {
+                    const fullText = decodeURIComponent(nameMatch[1].replace(/\+/g, ' '));
+                    const parts = fullText.split(',');
+                    
+                    if (!document.getElementById('societyName').value) {
+                        document.getElementById('societyName').value = parts[0].trim();
+                    }
+                    
+                    if (!document.getElementById('societyAddress').value && parts.length > 1) {
+                        document.getElementById('societyAddress').value = parts.slice(1).join(',').trim();
+                    }
+                } else {
+                    // Fallback to reverse geocoding if URL doesn't have name
+                    if (!document.getElementById('societyName').value || !document.getElementById('societyAddress').value) {
+                        fetch(`https://photon.komoot.io/reverse?lon=${lng}&lat=${lat}`)
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data.features && data.features.length > 0) {
+                                    const props = data.features[0].properties;
+                                    if (!document.getElementById('societyName').value) {
+                                        document.getElementById('societyName').value = props.name || props.street || 'Unknown';
+                                    }
+                                    if (!document.getElementById('societyAddress').value) {
+                                        const addrParts = [props.street, props.city, props.district, props.state].filter(Boolean);
+                                        document.getElementById('societyAddress').value = addrParts.join(', ');
+                                    }
+                                }
+                            }).catch(() => {});
+                    }
                 }
             }
         });
